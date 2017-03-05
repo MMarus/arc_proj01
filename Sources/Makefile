@@ -39,6 +39,7 @@ LDFLAGS       = -std=c++11 -O3 -fopenmp
 LDFLAGS_NOPHI = -mavx -L$(HDF5_DIR)/lib/ -Wl,-rpath,$(HDF5_DIR)/lib/
 LDFLAGS_PHI   = -mmic -L$(HDF5_PHI_DIR)/lib/ -Wl,-rpath,$(HDF5_PHI_DIR)/lib/
 
+CORES=6
 
 all:    $(TARGET) 
 
@@ -84,22 +85,22 @@ test:
 	./$(TARGET) -n 100 -m 0 -w 1 -t 1 -i ../DataGenerator/material.h5 -o result.h5
 
 seq:	$(TARGET)
-	./$(TARGET) -n 10000 -m 0 -w 100 -t 4 -i ../DataGenerator/material.h5 -o result.h5
+	./$(TARGET) -n 10000 -m 0 -w 100 -t $(CORES) -i ../DataGenerator/material.h5 -o result.h5
 	
 par1:	$(TARGET)
-	./$(TARGET) -n 10000 -m 1 -w 100 -t 4 -i ../DataGenerator/material.h5 -o result.h5
+	./$(TARGET) -n 10000 -m 1 -w 100 -t $(CORES) -i ../DataGenerator/material.h5 -o result.h5
 
 ver1:	$(TARGET)
-	./$(TARGET) -n 10000 -m 1 -w 100 -t 4 -i ../DataGenerator/material.h5 -o result.h5 -v
+	./$(TARGET) -n 10000 -m 1 -w 100 -t $(CORES) -i ../DataGenerator/material.h5 -o result.h5 -v
 
 
 
 par2:	$(TARGET)
-	./$(TARGET) -n 10000 -m 2 -w 100 -t 4 -i ../DataGenerator/material.h5 -o result.h5
+	./$(TARGET) -n 10000 -m 2 -w 100 -t $(CORES) -i ../DataGenerator/material.h5 -o result.h5
 
 
 ver2:	$(TARGET)
-	./$(TARGET) -n 10000 -m 2 -w 100 -t 4 -i ../DataGenerator/material.h5 -o result.h5 -v
+	./$(TARGET) -n 10000 -m 2 -w 100 -t $(CORES) -i ../DataGenerator/material.h5 -o result.h5 -v
 
 clean:
 	rm -f *.o  $(TARGET) $(TARGET_PHI) result_seq.h5
