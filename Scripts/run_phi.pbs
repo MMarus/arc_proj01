@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -A dd-17-10
+#PBS -q qexp
+#PBS -l walltime=01:00:00
+#PBS -l select=1:ncpus=24:accelerator=True:naccelerators=2
+#PBS -o /dev/null
+#PBS -e /dev/null 
+
+cd "$PBS_O_WORKDIR"
+
+ssh mic0 "$PBS_O_WORKDIR/run_phi.sh $PBS_O_WORKDIR"
+
