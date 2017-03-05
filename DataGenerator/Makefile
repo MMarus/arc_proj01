@@ -21,36 +21,29 @@
 
 #SET PATHS 
 #HDF5_DIR=/apps/all/HDF5/1.8.13-intel-2016.01#/usr/local/ # hdf5 installation folder
-
-#HDF5_DIR=/apps/all/HDF5/1.8.16-intel-2017.00
-HDF5_DIR=/usr/#/apps/all/HDF5/1.8.16-intel-2017.00
+HDF5_DIR=/apps/all/HDF5/1.8.16-intel-2017.00
 HDF5_PHI_DIR = '../HDF5_phi'
 
 
-#CXX  = icpc
-CXX  = g++
+CXX  = icpc
 
-CXXFLAGS       = -std=c++11 -O3 -fopenmp -I. 
-#CXXFLAGS       = -std=c++11 -O3 -qopenmp -I. 
-#CXXFLAGS_NOPHI = -xhost -I$(HDF5_DIR)/include
-CXXFLAGS_NOPHI = -mavx -I$(HDF5_DIR)/include
+CXXFLAGS       = -std=c++11 -O3 -qopenmp -I.
+CXXFLAGS_NOPHI = -xhost -I$(HDF5_DIR)/include
 CXXFLAGS_PHI   = -mmic -I$(HDF5_PHI_DIR)/include
 
 TARGET     = arc_generator
 TARGET_PHI = arc_generator_phi
 
-LDFLAGS       = -std=c++11 -O3 -fopenmp
-#LDFLAGS       = -std=c++11 -O3 -qopenmp
-LDFLAGS_NOPHI = -mavx -L$(HDF5_DIR)/lib/ -Wl,-rpath,$(HDF5_DIR)/lib/
-#LDFLAGS_NOPHI = -xhost -L$(HDF5_DIR)/lib/ -Wl,-rpath,$(HDF5_DIR)/lib/
+LDFLAGS       = -std=c++11 -O3 -qopenmp
+LDFLAGS_NOPHI = -xhost -L$(HDF5_DIR)/lib/ -Wl,-rpath,$(HDF5_DIR)/lib/
 LDFLAGS_PHI   = -mmic -L$(HDF5_PHI_DIR)/lib/ -Wl,-rpath,$(HDF5_PHI_DIR)/lib/
 
 
-all:    $(TARGET) 
+all:    $(TARGET)
 
 #---------------------------------------------------------
 
-$(TARGET):  $(TARGET).o          
+$(TARGET):  $(TARGET).o
 	$(CXX) $(LDFLAGS) $(LDFLAGS_NOPHI) $(TARGET).o \
     -lhdf5_hl -lhdf5 \
     -o $@
@@ -61,7 +54,7 @@ $(TARGET).o : $(TARGET).cpp
 
 #---------------------------------------------------------
 
-phi:  $(TARGET_PHI).o           
+phi:  $(TARGET_PHI).o
 	$(CXX) $(LDFLAGS) $(LDFLAGS_PHI) $(TARGET_PHI).o \
     -lhdf5_hl -lhdf5 \
     -o $(TARGET_PHI)
@@ -77,4 +70,3 @@ test:
 
 clean:
 	rm -f *.o  $(TARGET) $(TARGET_PHI) material.h5
-
