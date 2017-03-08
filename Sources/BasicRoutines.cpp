@@ -154,18 +154,19 @@ bool VerifyResults(const float      * seqResult,
                    const TParameters  parameters,
                    const float        epsilon)
 {
+  bool OK = true;
   for (size_t i = 0; i < parameters.edgeSize * parameters.edgeSize; i++)
   {
     if (fabs(parResult[i] - seqResult[i]) > epsilon)
     {
-      printf("Error found at position -> difference: ");
+      printf("Error pos -> diff: ");
       printf("[%ld, %ld] -> %e \n", i / parameters.edgeSize, i % parameters.edgeSize,
-                                    parResult[i] - seqResult[i]);
-      return false;
+             parResult[i] - seqResult[i]);
+      OK = false;
     }
   }// for
 
-  return true;
+  return OK;
 }//end of VerifyResults
 //------------------------------------------------------------------------------
 

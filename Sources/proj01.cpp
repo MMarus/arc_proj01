@@ -305,8 +305,11 @@ void ParallelHeatDistributionNonOverlapped(float *                     parResult
   //--------------------------------------------------------------------------//
   //-------- START OF THE PART WHERE STUDENTS MAY ADD/EDIT OMP PRAGMAS -------//
   //--------------------------------------------------------------------------//  
-  #pragma omp parallel firstprivate(printCounter)
+  #pragma omp parallel firstprivate(printCounter) private(iteration)
   {
+//    #pragma omp master
+//    printf("Pocet vsetkych jadier %d\n", omp_get_num_threads());
+
     #pragma omp for
     for  (i = 0; i < materialProperties.nGridPoints; i++)
     {
@@ -314,22 +317,16 @@ void ParallelHeatDistributionNonOverlapped(float *                     parResult
       parResult[i] = materialProperties.initTemp[i];
     }
 
-    //vyskusaj collapse(3) a simd
-#pragma omp master
     for (iteration = 0; iteration < parameters.nIterations; iteration++)
     {
-//      // calculate one iteration of the heat distribution
-//      // We skip the grid points at the edges
+      // calculate one iteration of the heat distribution
+      // We skip the grid points at the edges
 
-        //printf("%d jadro: %d pocet jadier: %d\n", iteration, omp_get_thread_num(), omp_get_num_threads());
-
-
+      #pragma omp for firstprivate(oldTemp, newTemp) private(j)
       for (i = 2; i < materialProperties.edgeSize - 2; i++) {
         //
-        #pragma omp task firstprivate(oldTemp, newTemp) private(j)
-        {
-          for (j = 2; j < materialProperties.edgeSize - 2; j++) {
-            //printf("Tu netreba ordered i = %d j = %d ", i, j);
+        for (j = 2; j < materialProperties.edgeSize - 2; j++) {
+            //printf("ITERACIE iteration = %d i = %d j = %d vlakno %d \n", iteration, i, j, omp_get_thread_num());
             //TODO:tento for trva 35.46970s
             // [a)] Calculate neighbor indices
             const int center = i * materialProperties.edgeSize + j;
@@ -371,24 +368,23 @@ void ParallelHeatDistributionNonOverlapped(float *                     parResult
                         : pointTemp;
 
             newTemp[center] = pointTemp;
-
-          } // for j
-        }
-        }// for i
-
+        } // for j
+      }// for i
         //TODO: Tento kusok trva pri 10k 0.074s-0.00045s
 
-
         //calculate average temperature in the middle column
+#pragma omp master
         middleColAvgTemp = 0.0f;
+#pragma omp barrier
 
-        //TODO: Tuto pouzit redukciu
-        //#pragma omp for reduction(+:middleColAvgTemp)
+        #pragma omp for  reduction(+:middleColAvgTemp)
         for (i = 0; i < materialProperties.edgeSize; i++) {
           middleColAvgTemp += newTemp[i * materialProperties.edgeSize +
                                       materialProperties.edgeSize / 2];
         }
 
+        #pragma omp master
+        {
           middleColAvgTemp /= materialProperties.edgeSize;
           // Store time step in the output file if necessary
           if ((file_id != H5I_INVALID_HID) && ((iteration % parameters.diskWriteIntensity) == 0)) {
@@ -409,6 +405,8 @@ void ParallelHeatDistributionNonOverlapped(float *                     parResult
                    middleColAvgTemp);
             ++printCounter;
           }
+        }
+#pragma omp barrier
     }// for iteration
   } // pragma parallel
 
