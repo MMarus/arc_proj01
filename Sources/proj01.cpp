@@ -244,15 +244,15 @@ void SequentialHeatDistribution(float *seqResult,
 
 /**
  * Parallel version of the Heat distribution in heterogenous 2D medium
- * with non-overlapped file output. 
+ * with non-overlapped file output.
  * @param [out] parResult          - Final heat distribution
  * @param [in]  materialProperties - Material properties
  * @param [in]  parameters         - parameters of the simulation
  * @param [in]  outputFileName     - Output file name (if NULL string, do not store)
  *
- * @note This is one of two functions that students are allowed to change and 
- *       optimize. Do not modify the given code, add only openmp pragmas or 
- *       openmp calls.                                                      
+ * @note This is one of two functions that students are allowed to change and
+ *       optimize. Do not modify the given code, add only openmp pragmas or
+ *       openmp calls.
  */
 void ParallelHeatDistributionNonOverlapped(float *parResult,
                                            const TMaterialProperties &materialProperties,
@@ -428,15 +428,15 @@ void ParallelHeatDistributionNonOverlapped(float *parResult,
 
 /**
  * Parallel version of the Heat distribution in heterogenous 2D medium
- * with overlapped file output. 
+ * with overlapped file output.
  * @param [out] parResult          - Final heat distribution
  * @param [in]  materialProperties - Material properties
  * @param [in]  parameters         - parameters of the simulation
  * @param [in]  outputFileName     - Output file name (if NULL string, do not store)
  *
- * @note This is one of two functions that students are allowed to change and 
- *       optimize. Do not modify the given code, add only openmp pragmas or 
- *       openmp calls.                                                      
+ * @note This is one of two functions that students are allowed to change and
+ *       optimize. Do not modify the given code, add only openmp pragmas or
+ *       openmp calls.
  */
 void ParallelHeatDistributionOverlapped(float *parResult,
                                         const TMaterialProperties &materialProperties,
@@ -479,14 +479,21 @@ void ParallelHeatDistributionOverlapped(float *parResult,
     size_t i, j;
     size_t iteration, printCounter = 1;
     float middleColAvgTemp = 0.0f;
+    bufferFreeFlag = true;
 
     //--------------------------------------------------------------------------//
     //---------------------------- START OF YOUR CODE --------------------------//
     //--------------------------------------------------------------------------//
     //Zacnem s 2 vlaknami
+    omp_set_nested(1);
+    int nt = (parameters.nThreads > 1) ? (parameters.nThreads - 1) : parameters.nThreads;
+    fprintf(stderr,"NT : %d", nt);
+    int iterationFlag;
+
 #pragma omp parallel firstprivate(printCounter) private(iteration) num_threads(2)
     {
 
+        fprintf(stderr,"Parallel vlakno c: %d / %d \n", omp_get_thread_num(), omp_get_num_threads());
 //Inicializacna cast
 #pragma omp for simd
         for (i = 0; i < materialProperties.nGridPoints; i++) {
@@ -494,18 +501,22 @@ void ParallelHeatDistributionOverlapped(float *parResult,
             parResult[i] = materialProperties.initTemp[i];
         }
 
-#pragma omp sections
+#pragma omp sections private(iteration)
         {
 //Vypocetna cast
 #pragma omp section
             {
-#pragma omp parallel
+                fprintf(stderr,"Parallel->Section1 : Vypocetna sekcia vlakno c: %d / %d \n", omp_get_thread_num(), omp_get_num_threads());
+
+#pragma omp parallel num_threads(nt) private(iteration) firstprivate(oldTemp, newTemp)
                 {
+                   fprintf(stderr,"Parallel->Section1->parallel vypocet vlakno c: %d / %d \n", omp_get_thread_num(), omp_get_num_threads());
+
                     for (iteration = 0; iteration < parameters.nIterations; iteration++) {
                         // calculate one iteration of the heat distribution
                         // We skip the grid points at the edges
 
-#pragma omp for firstprivate(oldTemp, newTemp) private(j)
+#pragma omp for private(j)
                         for (i = 2; i < materialProperties.edgeSize - 2; i++) {
                             //
                             for (j = 2; j < materialProperties.edgeSize - 2; j++) {
@@ -551,12 +562,18 @@ void ParallelHeatDistributionOverlapped(float *parResult,
                                             : pointTemp;
 
                                 newTemp[center] = pointTemp;
+
+
+
                             } // for j
                         }// for i
 
                         //calculate average temperature in the middle column
 #pragma omp master
-                        middleColAvgTemp = 0.0f;
+                        {
+                            //fprintf(stderr,"Parallel->Section1->parallel-iteration: %d - i = %d - j = %d vypocet vlakno c: %d / %d \n",iteration,i,j, omp_get_thread_num(), omp_get_num_threads());
+                            middleColAvgTemp = 0.0f;
+                        }
 #pragma omp barrier
 
 #pragma omp for simd reduction(+:middleColAvgTemp)
@@ -566,41 +583,113 @@ void ParallelHeatDistributionOverlapped(float *parResult,
                         }
 #pragma omp master
                         middleColAvgTemp /= materialProperties.edgeSize;
-//Tu ulozit do bufferu tu premmennu
 #pragma omp barrier
+
+                        //Tu ulozit do bufferu tu premmennu
+                        if((iteration % parameters.diskWriteIntensity) == 0){
+#pragma omp master
+                            {
+                                bool bufferFree;
+                                bool writeFinished;
+                                //CAKAM DOKYM SA BUFFER VYPRAZDNI
+
+                                while (1) {
+#pragma omp flush(bufferFreeFlag)
+#pragma omp atomic read
+                                    bufferFree = bufferFreeFlag;
+                                   //printf("cakam kym sa buffer vyprazdni bufferFree %d %d - i = %d - j = %d vypocet vlakno c: %d / %d \n",bufferFree, iteration,i,j, omp_get_thread_num(), omp_get_num_threads());
+
+                                    if (bufferFree == true)
+                                        break;
+                                }
+#pragma omp flush
+                               //fprintf(stderr,"Kopirujem data do bufferu iteration = %d\n", iteration);
+                            }
+
+#pragma omp barrier
+
+                            //Copy the buffer
+#pragma omp for simd
+                            for (i = 0; i < materialProperties.nGridPoints; i++) {
+                                buffer[i] = newTemp[i];
+                            }
+#pragma omp master
+                            {
+                                //Nastav cislo iteracie
+#pragma omp flush
+#pragma omp atomic write
+                                iterationFlag = iteration;
+#pragma omp atomic write
+                                //Nastav ze buffer je plny
+                                bufferFreeFlag = false;
+#pragma omp flush(iterationFlag, bufferFreeFlag)
+                                //fprintf(stderr,"iterationFlag nastaven na  %d\n", iterationFlag);
+                            }
+#pragma omp barrier
+                        } // konec IF iteration % parameters.diskWriteIntensity
+
+                        // swap new and old values
+                        swap(newTemp, oldTemp);
+#pragma omp master
+                        {
+                            if (((float) (iteration) >= (parameters.nIterations - 1) / 10.0f * (float) printCounter)
+                                && !parameters.batchMode) {
+                                printf("Progress %ld%% (Average Temperature %.2f degrees)\n",
+                                       (iteration + 1) * 100L / (parameters.nIterations),
+                                       middleColAvgTemp);
+                                ++printCounter;
+                            }
+                        }
                     }// for iteration
                 }
+#pragma omp flush
+#pragma omp atomic write
+                //Koniec vypoctov, mozeme ukoncit I/O vlakno
+                writeFinishedFlag = true;
+#pragma omp flush(writeFinishedFlag)
             }
-//Zapisovacia cast
+
+//ZAPISOVACIA CAST
 #pragma omp section
             {
-                //TODO:if(buffer.isFull())
-                //TODO:buffer.write()
+                bool bufferFree;
+                bool writeFinished;
+                fprintf(stderr,"Parallel->Section2 Zapisovacia sekcia vlakno c: %d / %d \n", omp_get_thread_num(), omp_get_num_threads());
 
-                //TODO:if(finished)
-                //TODO:stop section
-                // Store time step in the output file if necessary
-                if ((file_id != H5I_INVALID_HID) && ((iteration % parameters.diskWriteIntensity) == 0)) {
-                    StoreDataIntoFile(file_id,
-                                      newTemp,
-                                      materialProperties.edgeSize,
-                                      iteration / parameters.diskWriteIntensity,
-                                      iteration);
-                }
+                while(1){
+#pragma omp flush(writeFinishedFlag, bufferFreeFlag, iterationFlag)
+#pragma omp atomic read
+                    writeFinished = writeFinishedFlag;
+                    //fprintf(stderr, "Cakam na writeFinished %d\n", writeFinished);
+#pragma omp atomic read
+                    bufferFree = bufferFreeFlag;
 
-                // swap new and old values
-                swap(newTemp, oldTemp);
+                    //printf("Cakam na bufferFree %d alebo write finshed %d\n", bufferFree, writeFinished);
 
-                if (((float) (iteration) >= (parameters.nIterations - 1) / 10.0f * (float) printCounter)
-                    && !parameters.batchMode) {
-                    printf("Progress %ld%% (Average Temperature %.2f degrees)\n",
-                           (iteration + 1) * 100L / (parameters.nIterations),
-                           middleColAvgTemp);
-                    ++printCounter;
-                }
+                    if(bufferFree == false){
+#pragma omp atomic read
+                        iteration = iterationFlag;
+                        // Store time step in the output file if necessary
+                        //fprintf(stderr,"!!!!!!ZAPISUJEM DATA DO SUBORU Iteration = %d\n", iteration);
+                        if ((file_id != H5I_INVALID_HID)) {
+
+                            StoreDataIntoFile(file_id, buffer, materialProperties.edgeSize,
+                                              iteration / parameters.diskWriteIntensity,
+                                              iteration);
+                        }
+#pragma omp flush
+#pragma omp atomic write
+                        //Nastav ze buffer je znova prazdny
+                        bufferFreeFlag = true;
+#pragma omp flush(bufferFreeFlag)
+                    }
 
 
-            }
+                    if(writeFinished == true)
+                        break;
+                } //while writeFinishedFlag == false
+#pragma omp flush
+            }//section I/O
         }
     }
     //--------------------------------------------------------------------------//

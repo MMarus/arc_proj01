@@ -28,7 +28,7 @@ HDF5_PHI_DIR = '../HDF5_phi'
 
 CXX  = g++ 
 
-CXXFLAGS       = -W -Wall -Wextra -pedantic -std=c++11 -O3 -fopenmp -I. 
+CXXFLAGS       = -W -Wall -Wextra -pedantic -std=c++11 -O3 -fopenmp -I.
 CXXFLAGS_NOPHI = -mavx -I$(HDF5_DIR)/include
 CXXFLAGS_PHI   = -mmic -I$(HDF5_PHI_DIR)/include
 

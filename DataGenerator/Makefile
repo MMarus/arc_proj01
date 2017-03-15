@@ -73,8 +73,17 @@ $(TARGET_PHI).o : $(TARGET).cpp
 #---------------------------------------------------------
 
 test:
-	./$(TARGET) -o material.h5 -N 512 -H 100 -C 20
+	./$(TARGET) -o material.h5.original -N 512 -H 100 -C 20
 
+
+test1:
+	./$(TARGET) -o material.h5 -N 2048 -H 100 -C 20
+
+test2:
+	./$(TARGET) -o material.h5.4096 -N 4096 -H 100 -C 20
+
+test3:
+	./$(TARGET) -o material.h5.1024 -N 1024 -H 100 -C 20
 clean:
 	rm -f *.o  $(TARGET) $(TARGET_PHI) material.h5
 
