@@ -502,16 +502,15 @@ void ParallelHeatDistributionOverlapped(float *parResult,
 //Vypocetna cast
 #pragma omp section
             {
-#pragma omp parallel num_threads(nt) private(iteration) firstprivate(oldTemp, newTemp)
+#pragma omp parallel num_threads(nt) private(iteration)
                 {
                     for (iteration = 0; iteration < parameters.nIterations; iteration++) {
                         // calculate one iteration of the heat distribution
                         // We skip the grid points at the edges
-#pragma omp for private(j)
+#pragma omp for firstprivate(oldTemp, newTemp) private(j)
                         for (i = 2; i < materialProperties.edgeSize - 2; i++) {
                             //
                             for (j = 2; j < materialProperties.edgeSize - 2; j++) {
-                                printf("ITERACIE iteration = %d i = %d j = %d vlakno %d \n", iteration, i, j, omp_get_thread_num());
                                 //TODO:tento for trva 35.46970s
                                 // [a)] Calculate neighbor indices
                                 const int center = i * materialProperties.edgeSize + j;
@@ -610,11 +609,12 @@ void ParallelHeatDistributionOverlapped(float *parResult,
                             }
 #pragma omp barrier
                         } // konec IF iteration % parameters.diskWriteIntensity
-                        // swap new and old values
-                        swap(newTemp, oldTemp);
+
                         //Vypis statusu
 #pragma omp master
                         {
+                            // swap new and old values
+                            swap(newTemp, oldTemp);
                             if (((float) (iteration) >= (parameters.nIterations - 1) / 10.0f * (float) printCounter)
                                 && !parameters.batchMode) {
                                 printf("Progress %ld%% (Average Temperature %.2f degrees)\n",
@@ -623,6 +623,7 @@ void ParallelHeatDistributionOverlapped(float *parResult,
                                 ++printCounter;
                             }
                         }
+#pragma omp barrier
                     }// for iteration
                 }
 #pragma omp flush
