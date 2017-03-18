@@ -490,16 +490,24 @@ void ParallelHeatDistributionOverlapped(float *parResult,
     fprintf(stderr,"NT : %d", nt);
     int iterationFlag;
 
+    // first touch policy
+#pragma omp parallel for simd
+    for (i = 0; i < materialProperties.nGridPoints; i++) {
+        tempArray[i] = materialProperties.initTemp[i];
+        parResult[i] = materialProperties.initTemp[i];
+        buffer[i] = materialProperties.initTemp[i];
+    }
+
 #pragma omp parallel firstprivate(printCounter) private(iteration) num_threads(2)
     {
 
         fprintf(stderr,"Parallel vlakno c: %d / %d \n", omp_get_thread_num(), omp_get_num_threads());
 //Inicializacna cast
-#pragma omp for simd
-        for (i = 0; i < materialProperties.nGridPoints; i++) {
-            tempArray[i] = materialProperties.initTemp[i];
-            parResult[i] = materialProperties.initTemp[i];
-        }
+//#pragma omp for simd
+//        for (i = 0; i < materialProperties.nGridPoints; i++) {
+//            tempArray[i] = materialProperties.initTemp[i];
+//            parResult[i] = materialProperties.initTemp[i];
+//        }
 
 #pragma omp sections private(iteration)
         {
@@ -602,10 +610,8 @@ void ParallelHeatDistributionOverlapped(float *parResult,
                                     if (bufferFree == true)
                                         break;
                                 }
-#pragma omp flush
                                //fprintf(stderr,"Kopirujem data do bufferu iteration = %d\n", iteration);
                             }
-
 #pragma omp barrier
 
                             //Copy the buffer
